@@ -1,0 +1,40 @@
+# Environment variables & secrets
+.env
+.env.local
+*.env
+
+# Compiled Java & Maven output
+target/
+build/
+*.jar
+*.war
+*.class
+.mvn/wrapper/maven-wrapper.jar
+
+# Logs
+*.log
+logs/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Visual Studio Code
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker / Database persistent data if stored locally
+*.db
+docker-data/

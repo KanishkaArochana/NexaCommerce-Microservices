@@ -1,0 +1,55 @@
+# ==========================================
+# NexaCommerce Monorepo / Microservices Git Ignore
+# ==========================================
+
+# Secrets & Environment Variables (NEVER COMMIT)
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+**/*.env
+
+# Compiled Binaries & Build Outputs
+target/
+**/target/
+build/
+**/build/
+*.class
+**/*.class
+*.jar
+**/*.jar
+*.war
+**/*.war
+.mvn/wrapper/maven-wrapper.jar
+
+# Logs
+*.log
+**/logs/
+
+# IntelliJ IDEA
+.idea/
+**/.idea/
+*.iml
+**/*.iml
+*.iws
+*.ipr
+out/
+**/out/
+
+# Visual Studio Code
+.vscode/
+**/.vscode/
+
+# Eclipse
+.project
+**/.project
+.classpath
+**/.classpath
+.settings/
+**/.settings/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
