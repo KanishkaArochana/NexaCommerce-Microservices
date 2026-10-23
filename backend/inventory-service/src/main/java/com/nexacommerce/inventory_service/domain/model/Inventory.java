@@ -62,15 +62,15 @@ public class Inventory {
     }
 
     public void updateStock(int quantity) {
-        if (quantity < reservedQuantity) {
-            throw new IllegalArgumentException(
-                    "Stock cannot be less than reserved quantity"
-            );
-        }
-
         if (quantity < 0) {
             throw new IllegalArgumentException(
                     "Stock quantity cannot be negative"
+            );
+        }
+
+        if (quantity < reservedQuantity) {
+            throw new IllegalArgumentException(
+                    "Stock cannot be less than reserved quantity"
             );
         }
 
