@@ -1,10 +1,13 @@
 package com.nexacommerce.user_service.application.service;
 
+import com.nexacommerce.user_service.application.dto.LoginRequest;
+import com.nexacommerce.user_service.application.dto.LoginResponse;
 import com.nexacommerce.user_service.application.dto.UserRegistrationRequest;
 import com.nexacommerce.user_service.application.dto.UserResponse;
 import com.nexacommerce.user_service.application.dto.UserUpdateRequest;
 import com.nexacommerce.user_service.domain.model.User;
 import com.nexacommerce.user_service.infrastructure.persistence.UserRepository;
+import com.nexacommerce.user_service.infrastructure.security.JwtService;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,13 +21,16 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     public UserService(
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     @Transactional
@@ -56,6 +62,28 @@ public class UserService {
 
     public UserResponse registerUser(UserRegistrationRequest request) {
         return register(request);
+    }
+
+    @Transactional(readOnly = true)
+    public LoginResponse login(LoginRequest request) {
+        String email = request.email()
+                .trim()
+                .toLowerCase(Locale.ROOT);
+
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
+
+        if (!user.isActive()) {
+            throw new IllegalStateException("User account is inactive");
+        }
+
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new IllegalArgumentException("Invalid email or password");
+        }
+
+        String token = jwtService.generateToken(user);
+
+        return LoginResponse.of(token, jwtService.getExpirationTime(), toResponse(user));
     }
 
     @Transactional(readOnly = true)

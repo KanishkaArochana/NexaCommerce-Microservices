@@ -1,6 +1,7 @@
-
 package com.nexacommerce.user_service.presentation.controller;
 
+import com.nexacommerce.user_service.application.dto.LoginRequest;
+import com.nexacommerce.user_service.application.dto.LoginResponse;
 import com.nexacommerce.user_service.application.dto.UserRegistrationRequest;
 import com.nexacommerce.user_service.application.dto.UserResponse;
 import com.nexacommerce.user_service.application.dto.UserUpdateRequest;
@@ -29,6 +30,13 @@ public class UserController {
             @Valid @RequestBody UserRegistrationRequest request
     ) {
         return userService.register(request);
+    }
+
+    @PostMapping("/login")
+    public LoginResponse login(
+            @Valid @RequestBody LoginRequest request
+    ) {
+        return userService.login(request);
     }
 
     @GetMapping("/{id}")
