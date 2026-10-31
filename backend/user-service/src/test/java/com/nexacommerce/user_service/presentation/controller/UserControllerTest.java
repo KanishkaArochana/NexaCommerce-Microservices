@@ -1,5 +1,7 @@
 package com.nexacommerce.user_service.presentation.controller;
 
+import com.nexacommerce.user_service.application.dto.LoginRequest;
+import com.nexacommerce.user_service.application.dto.LoginResponse;
 import com.nexacommerce.user_service.application.dto.UserRegistrationRequest;
 import com.nexacommerce.user_service.application.dto.UserResponse;
 import com.nexacommerce.user_service.application.dto.UserUpdateRequest;
@@ -82,6 +84,32 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.active", is(true)));
 
         verify(userService).register(any(UserRegistrationRequest.class));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/users/login - Should return 200 OK with token when credentials are valid")
+    void login_Returns200Ok_WithToken_WhenCredentialsValid() throws Exception {
+        LoginResponse loginResponse = LoginResponse.of("mock.jwt.token", 86400000L, sampleResponse);
+
+        when(userService.login(any(LoginRequest.class))).thenReturn(loginResponse);
+
+        String jsonRequest = """
+                {
+                    "email": "john.doe@example.com",
+                    "password": "Password123"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/users/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken", is("mock.jwt.token")))
+                .andExpect(jsonPath("$.tokenType", is("Bearer")))
+                .andExpect(jsonPath("$.expiresIn", is(86400000)))
+                .andExpect(jsonPath("$.user.email", is("john.doe@example.com")));
+
+        verify(userService).login(any(LoginRequest.class));
     }
 
     @Test

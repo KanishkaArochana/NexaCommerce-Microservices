@@ -1,10 +1,13 @@
 package com.nexacommerce.user_service.application.service;
 
+import com.nexacommerce.user_service.application.dto.LoginRequest;
+import com.nexacommerce.user_service.application.dto.LoginResponse;
 import com.nexacommerce.user_service.application.dto.UserRegistrationRequest;
 import com.nexacommerce.user_service.application.dto.UserResponse;
 import com.nexacommerce.user_service.application.dto.UserUpdateRequest;
 import com.nexacommerce.user_service.domain.model.User;
 import com.nexacommerce.user_service.infrastructure.persistence.UserRepository;
+import com.nexacommerce.user_service.infrastructure.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +37,9 @@ class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtService jwtService;
 
     @InjectMocks
     private UserService userService;
@@ -101,6 +107,88 @@ class UserServiceTest {
             verify(userRepository, times(1)).existsByEmailIgnoreCase("existing@example.com");
             verify(passwordEncoder, never()).encode(anyString());
             verify(userRepository, never()).save(any(User.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("login() Tests")
+    class LoginTests {
+
+        @Test
+        @DisplayName("Should successfully login and return JWT token when credentials are valid")
+        void login_Success() {
+            // Arrange
+            LoginRequest request = new LoginRequest("john.doe@example.com", "Password@123");
+
+            when(userRepository.findByEmailIgnoreCase("john.doe@example.com")).thenReturn(Optional.of(sampleUser));
+            when(passwordEncoder.matches("Password@123", "encodedPassword123")).thenReturn(true);
+            when(jwtService.generateToken(sampleUser)).thenReturn("sample.jwt.token");
+            when(jwtService.getExpirationTime()).thenReturn(86400000L);
+
+            // Act
+            LoginResponse response = userService.login(request);
+
+            // Assert
+            assertThat(response).isNotNull();
+            assertThat(response.accessToken()).isEqualTo("sample.jwt.token");
+            assertThat(response.tokenType()).isEqualTo("Bearer");
+            assertThat(response.expiresIn()).isEqualTo(86400000L);
+            assertThat(response.user().email()).isEqualTo("john.doe@example.com");
+
+            verify(userRepository).findByEmailIgnoreCase("john.doe@example.com");
+            verify(passwordEncoder).matches("Password@123", "encodedPassword123");
+            verify(jwtService).generateToken(sampleUser);
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalArgumentException when email does not exist")
+        void login_ThrowsException_WhenEmailNotFound() {
+            // Arrange
+            LoginRequest request = new LoginRequest("unknown@example.com", "Password@123");
+            when(userRepository.findByEmailIgnoreCase("unknown@example.com")).thenReturn(Optional.empty());
+
+            // Act & Assert
+            assertThatThrownBy(() -> userService.login(request))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Invalid email or password");
+
+            verify(userRepository).findByEmailIgnoreCase("unknown@example.com");
+            verify(passwordEncoder, never()).matches(anyString(), anyString());
+            verify(jwtService, never()).generateToken(any());
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalArgumentException when password does not match")
+        void login_ThrowsException_WhenPasswordDoesNotMatch() {
+            // Arrange
+            LoginRequest request = new LoginRequest("john.doe@example.com", "WrongPassword");
+            when(userRepository.findByEmailIgnoreCase("john.doe@example.com")).thenReturn(Optional.of(sampleUser));
+            when(passwordEncoder.matches("WrongPassword", "encodedPassword123")).thenReturn(false);
+
+            // Act & Assert
+            assertThatThrownBy(() -> userService.login(request))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Invalid email or password");
+
+            verify(passwordEncoder).matches("WrongPassword", "encodedPassword123");
+            verify(jwtService, never()).generateToken(any());
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalStateException when account is inactive")
+        void login_ThrowsException_WhenUserIsInactive() {
+            // Arrange
+            ReflectionTestUtils.setField(sampleUser, "active", false);
+            LoginRequest request = new LoginRequest("john.doe@example.com", "Password@123");
+            when(userRepository.findByEmailIgnoreCase("john.doe@example.com")).thenReturn(Optional.of(sampleUser));
+
+            // Act & Assert
+            assertThatThrownBy(() -> userService.login(request))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("User account is inactive");
+
+            verify(passwordEncoder, never()).matches(anyString(), anyString());
+            verify(jwtService, never()).generateToken(any());
         }
     }
 
