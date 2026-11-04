@@ -1,0 +1,23 @@
+# Git and version control
+.git/
+.gitignore
+
+# Local build artifacts
+target/
+build/
+
+# Environment files and credentials
+.env
+.env.*
+
+# IDE and editor files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Logs and OS files
+*.log
+Thumbs.db
+.DS_Store
