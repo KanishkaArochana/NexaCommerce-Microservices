@@ -1,0 +1,24 @@
+# Build artifacts & target
+target/
+build/
+out/
+
+# Environment files and credentials
+.env
+.env.*
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Git
+.git/
+.gitignore
+
+# Logs and temp files
+*.log
+logs/
+*.tmp
