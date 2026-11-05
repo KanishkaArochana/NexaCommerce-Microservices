@@ -51,3 +51,10 @@ out/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Allow tracking of .env.example files
+!**/.env.example
+
+# Spring Boot boilerplate documentation
+HELP.md
+**/HELP.md

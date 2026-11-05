@@ -1,7 +1,12 @@
+# Spring Boot boilerplate
+HELP.md
+
 # Environment variables & secrets
 .env
+.env.*
 .env.local
 *.env
+!.env.example
 
 # Compiled Java & Maven output
 target/
