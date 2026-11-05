@@ -1,0 +1,47 @@
+services:
+  inventory-db:
+    image: postgres:17-alpine
+    container_name: inventory-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-inventory_db}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-root}
+    ports:
+      - "5433:5432" # Host port 5433 (to avoid port 5432 collision with product-db)
+    volumes:
+      - inventory_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-inventory_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nexacommerce-network
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inventory-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      SERVER_PORT: 8083
+      DB_URL: jdbc:postgresql://inventory-db:5432/${DB_NAME:-inventory_db}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+    networks:
+      - nexacommerce-network
+
+volumes:
+  inventory_db_data:
+    driver: local
+
+networks:
+  nexacommerce-network:
+    driver: bridge
