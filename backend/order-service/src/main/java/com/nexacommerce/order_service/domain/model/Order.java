@@ -20,6 +20,10 @@ public class Order {
     @Column(name = "order_date", nullable = false)
     private LocalDateTime orderDate;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OrderStatus status;
+
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
@@ -42,22 +46,35 @@ public class Order {
     public Order(Long userId) {
         this.userId = userId;
         this.orderDate = LocalDateTime.now();
-        this.totalAmount = BigDecimal.ZERO;
+        this.status = OrderStatus.PENDING;
+    }
+
+    public void addItem(OrderItem item) {
+        item.setOrder(this);
+        items.add(item);
+        calculateTotal();
+    }
+
+    private void calculateTotal() {
+        totalAmount = items.stream()
+                .map(OrderItem::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public void updateStatus(OrderStatus status) {
+        this.status = status;
     }
 
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-        if (this.orderDate == null) {
-            this.orderDate = now;
-        }
+        createdAt = now;
+        updatedAt = now;
     }
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 
     public Long getId() {
@@ -72,12 +89,12 @@ public class Order {
         return orderDate;
     }
 
-    public BigDecimal getTotalAmount() {
-        return totalAmount;
+    public OrderStatus getStatus() {
+        return status;
     }
 
-    public void setTotalAmount(BigDecimal totalAmount) {
-        this.totalAmount = totalAmount;
+    public BigDecimal getTotalAmount() {
+        return totalAmount;
     }
 
     public List<OrderItem> getItems() {
