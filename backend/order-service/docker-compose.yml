@@ -1,0 +1,49 @@
+services:
+  order-db:
+    image: postgres:17-alpine
+    container_name: order-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${HOST_DB_PORT:-5435}:5432" # Host port 5435 
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nexacommerce-network
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order-service
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8085}:${SERVER_PORT:-8085}"
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8085}
+      DB_HOST: order-db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      order-db:
+        condition: service_healthy
+    networks:
+      - nexacommerce-network
+
+volumes:
+  order_db_data:
+    driver: local
+
+networks:
+  nexacommerce-network:
+    driver: bridge
