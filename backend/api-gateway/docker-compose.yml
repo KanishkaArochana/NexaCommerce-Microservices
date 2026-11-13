@@ -1,0 +1,33 @@
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      PRODUCT_SERVICE_HOST: ${PRODUCT_SERVICE_HOST:-product-service}
+      PRODUCT_SERVICE_PORT: ${PRODUCT_SERVICE_PORT:-8082}
+      INVENTORY_SERVICE_HOST: ${INVENTORY_SERVICE_HOST:-inventory-service}
+      INVENTORY_SERVICE_PORT: ${INVENTORY_SERVICE_PORT:-8083}
+      USER_SERVICE_HOST: ${USER_SERVICE_HOST:-user-service}
+      USER_SERVICE_PORT: ${USER_SERVICE_PORT:-8084}
+      ORDER_SERVICE_HOST: ${ORDER_SERVICE_HOST:-order-service}
+      ORDER_SERVICE_PORT: ${ORDER_SERVICE_PORT:-8085}
+      HEALTH_DETAILS: ${HEALTH_DETAILS:-always}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${SERVER_PORT:-8080}/actuator/health | grep UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - nexacommerce-network
+
+networks:
+  nexacommerce-network:
+    name: nexacommerce-network
+    driver: bridge
