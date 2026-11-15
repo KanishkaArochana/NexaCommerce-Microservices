@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build outputs
+target/
+*.jar
+
+# Environment and secrets
+.env
+.env.*
+*.env
+
+# IDE and Editor files
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Documentation and markdown
+docs/
+*.md
