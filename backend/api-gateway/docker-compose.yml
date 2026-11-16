@@ -17,6 +17,8 @@ services:
       USER_SERVICE_PORT: ${USER_SERVICE_PORT:-8084}
       ORDER_SERVICE_HOST: ${ORDER_SERVICE_HOST:-order-service}
       ORDER_SERVICE_PORT: ${ORDER_SERVICE_PORT:-8085}
+      PAYMENT_SERVICE_HOST: ${PAYMENT_SERVICE_HOST:-payment-service}
+      PAYMENT_SERVICE_PORT: ${PAYMENT_SERVICE_PORT:-8086}
       HEALTH_DETAILS: ${HEALTH_DETAILS:-always}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:${SERVER_PORT:-8080}/actuator/health | grep UP || exit 1"]
