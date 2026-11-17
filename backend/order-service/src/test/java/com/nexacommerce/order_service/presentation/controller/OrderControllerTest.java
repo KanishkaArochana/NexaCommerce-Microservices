@@ -16,6 +16,7 @@ import com.nexacommerce.order_service.application.dto.OrderRequest;
 import com.nexacommerce.order_service.application.dto.OrderResponse;
 import com.nexacommerce.order_service.application.service.OrderService;
 import com.nexacommerce.order_service.domain.model.OrderStatus;
+import com.nexacommerce.order_service.domain.model.PaymentMethod;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -66,11 +67,12 @@ class OrderControllerTest {
     @DisplayName("POST /api/v1/orders - Create Order")
     class CreateOrderEndpointTests {
 
+        // Return 201 when order request is valid
         @Test
         @DisplayName("Should return HTTP 201 Created and OrderResponse when given a valid OrderRequest")
         void create_ValidRequest_Returns201Created() throws Exception {
             OrderItemRequest itemRequest = new OrderItemRequest(10L, 2, new BigDecimal("50.00"));
-            OrderRequest request = new OrderRequest(100L, List.of(itemRequest));
+            OrderRequest request = new OrderRequest(100L, PaymentMethod.CARD, List.of(itemRequest));
             OrderResponse response = createSampleResponse();
 
             when(orderService.create(any(OrderRequest.class))).thenReturn(response);
@@ -88,10 +90,11 @@ class OrderControllerTest {
             verify(orderService).create(any(OrderRequest.class));
         }
 
+        // Return 400 when order request is invalid
         @Test
         @DisplayName("Should return HTTP 400 Bad Request when request body violates validation constraints")
         void create_InvalidRequest_Returns400BadRequest() throws Exception {
-            OrderRequest invalidRequest = new OrderRequest(null, List.of());
+            OrderRequest invalidRequest = new OrderRequest(null, null, List.of());
 
             mockMvc.perform(post("/api/v1/orders")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -104,6 +107,7 @@ class OrderControllerTest {
     @DisplayName("GET /api/v1/orders/{id} - Get Order By ID")
     class GetOrderByIdEndpointTests {
 
+        // Return 200 with order for existing ID
         @Test
         @DisplayName("Should return HTTP 200 OK and OrderResponse when order exists with given ID")
         void getById_ExistingId_Returns200Ok() throws Exception {
@@ -124,6 +128,7 @@ class OrderControllerTest {
     @DisplayName("GET /api/v1/orders - Get All Orders")
     class GetAllOrdersEndpointTests {
 
+        // Return 200 with list of all orders
         @Test
         @DisplayName("Should return HTTP 200 OK with list of all orders")
         void getAll_Returns200OkWithList() throws Exception {
@@ -144,6 +149,7 @@ class OrderControllerTest {
     @DisplayName("GET /api/v1/orders/user/{userId} - Get Orders By User ID")
     class GetOrdersByUserIdEndpointTests {
 
+        // Return 200 with orders for user ID
         @Test
         @DisplayName("Should return HTTP 200 OK with orders belonging to given user ID")
         void getByUserId_Returns200OkWithUserOrders() throws Exception {
@@ -163,6 +169,7 @@ class OrderControllerTest {
     @DisplayName("PATCH /api/v1/orders/{id}/status - Update Order Status")
     class UpdateStatusEndpointTests {
 
+        // Return 200 when order status is updated
         @Test
         @DisplayName("Should return HTTP 200 OK and updated OrderResponse when status is updated")
         void updateStatus_Returns200Ok() throws Exception {
