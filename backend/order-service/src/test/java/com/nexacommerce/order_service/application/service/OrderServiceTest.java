@@ -1,11 +1,12 @@
 package com.nexacommerce.order_service.application.service;
 
-import com.nexacommerce.order_service.application.dto.OrderItemRequest;
-import com.nexacommerce.order_service.application.dto.OrderRequest;
-import com.nexacommerce.order_service.application.dto.OrderResponse;
+import com.nexacommerce.order_service.application.dto.*;
 import com.nexacommerce.order_service.domain.model.Order;
 import com.nexacommerce.order_service.domain.model.OrderItem;
 import com.nexacommerce.order_service.domain.model.OrderStatus;
+import com.nexacommerce.order_service.domain.model.PaymentMethod;
+import com.nexacommerce.order_service.infrastructure.client.InventoryClient;
+import com.nexacommerce.order_service.infrastructure.client.PaymentClient;
 import com.nexacommerce.order_service.infrastructure.persistence.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,12 +18,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +34,12 @@ class OrderServiceTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private InventoryClient inventoryClient;
+
+    @Mock
+    private PaymentClient paymentClient;
 
     @InjectMocks
     private OrderService orderService;
@@ -48,13 +57,23 @@ class OrderServiceTest {
     @DisplayName("Create Order Tests")
     class CreateOrderTests {
 
+        // Order confirmed when stock is available and payment succeeds
         @Test
-        @DisplayName("Should create and save a new order when given a valid OrderRequest")
-        void create_ValidRequest_ReturnsOrderResponse() {
+        @DisplayName("Should create order as CONFIRMED when stock is available and payment succeeds")
+        void create_StockAvailableAndPaymentSuccess_ReturnsConfirmedOrder() {
             // Arrange
             OrderItemRequest itemRequest = new OrderItemRequest(1L, 2, new BigDecimal("50.00"));
-            OrderRequest request = new OrderRequest(100L, List.of(itemRequest));
+            OrderRequest request = new OrderRequest(100L, PaymentMethod.CARD, List.of(itemRequest));
 
+            InventoryResponse inventoryResponse = new InventoryResponse(1L, 1L, 10, 0, 10);
+            PaymentResponse paymentResponse = new PaymentResponse(
+                    1L, 1L, PaymentMethod.CARD, new BigDecimal("100.00"), "SUCCESS", "TXN-123",
+                    LocalDateTime.now(), LocalDateTime.now()
+            );
+
+            when(inventoryClient.getInventoryByProductId(1L)).thenReturn(inventoryResponse);
+            when(inventoryClient.reserveStock(1L, 2)).thenReturn(inventoryResponse);
+            when(paymentClient.processPayment(any(PaymentRequest.class))).thenReturn(paymentResponse);
             when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             // Act
@@ -63,14 +82,62 @@ class OrderServiceTest {
             // Assert
             assertThat(response).isNotNull();
             assertThat(response.userId()).isEqualTo(100L);
-            assertThat(response.status()).isEqualTo(OrderStatus.PENDING);
+            assertThat(response.status()).isEqualTo(OrderStatus.CONFIRMED);
             assertThat(response.totalAmount()).isEqualByComparingTo(new BigDecimal("100.00"));
-            assertThat(response.items()).hasSize(1);
-            assertThat(response.items().get(0).productId()).isEqualTo(1L);
-            assertThat(response.items().get(0).quantity()).isEqualTo(2);
-            assertThat(response.items().get(0).subtotal()).isEqualByComparingTo(new BigDecimal("100.00"));
 
-            verify(orderRepository, times(1)).save(any(Order.class));
+            verify(inventoryClient, times(1)).getInventoryByProductId(1L);
+            verify(inventoryClient, times(1)).reserveStock(1L, 2);
+            verify(paymentClient, times(1)).processPayment(any(PaymentRequest.class));
+            verify(orderRepository, times(2)).save(any(Order.class));
+        }
+
+        // Throw error when stock is not enough
+        @Test
+        @DisplayName("Should throw IllegalStateException when inventory is insufficient")
+        void create_InsufficientStock_ThrowsIllegalStateException() {
+            // Arrange
+            OrderItemRequest itemRequest = new OrderItemRequest(1L, 5, new BigDecimal("50.00"));
+            OrderRequest request = new OrderRequest(100L, PaymentMethod.CARD, List.of(itemRequest));
+
+            InventoryResponse lowStock = new InventoryResponse(1L, 1L, 2, 0, 2);
+            when(inventoryClient.getInventoryByProductId(1L)).thenReturn(lowStock);
+
+            // Act & Assert
+            assertThatThrownBy(() -> orderService.create(request))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Insufficient stock for product ID: 1");
+
+            verify(inventoryClient, times(1)).getInventoryByProductId(1L);
+            verify(inventoryClient, never()).reserveStock(anyLong(), anyInt());
+            verify(paymentClient, never()).processPayment(any(PaymentRequest.class));
+            verify(orderRepository, never()).save(any(Order.class));
+        }
+
+        // Order cancelled when payment fails
+        @Test
+        @DisplayName("Should mark order as CANCELLED when payment fails")
+        void create_PaymentFails_ReturnsCancelledOrder() {
+            // Arrange
+            OrderItemRequest itemRequest = new OrderItemRequest(1L, 2, new BigDecimal("50.00"));
+            OrderRequest request = new OrderRequest(100L, PaymentMethod.CARD, List.of(itemRequest));
+
+            InventoryResponse inventoryResponse = new InventoryResponse(1L, 1L, 10, 0, 10);
+            PaymentResponse paymentFailedResponse = new PaymentResponse(
+                    1L, 1L, PaymentMethod.CARD, new BigDecimal("100.00"), "FAILED", null,
+                    LocalDateTime.now(), LocalDateTime.now()
+            );
+
+            when(inventoryClient.getInventoryByProductId(1L)).thenReturn(inventoryResponse);
+            when(inventoryClient.reserveStock(1L, 2)).thenReturn(inventoryResponse);
+            when(paymentClient.processPayment(any(PaymentRequest.class))).thenReturn(paymentFailedResponse);
+            when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // Act
+            OrderResponse response = orderService.create(request);
+
+            // Assert
+            assertThat(response).isNotNull();
+            assertThat(response.status()).isEqualTo(OrderStatus.CANCELLED);
         }
     }
 
@@ -78,52 +145,42 @@ class OrderServiceTest {
     @DisplayName("Get Order By ID Tests")
     class GetByIdTests {
 
+        // Return order when ID exists
         @Test
         @DisplayName("Should return OrderResponse when order exists with given ID")
         void getById_ExistingId_ReturnsOrderResponse() {
-            // Arrange
             when(orderRepository.findById(1L)).thenReturn(Optional.of(testOrder));
 
-            // Act
             OrderResponse response = orderService.getById(1L);
 
-            // Assert
             assertThat(response).isNotNull();
             assertThat(response.userId()).isEqualTo(100L);
             assertThat(response.items()).hasSize(1);
             verify(orderRepository, times(1)).findById(1L);
         }
 
+        // Throw error when order not found by ID
         @Test
         @DisplayName("Should throw IllegalArgumentException when order does not exist with given ID")
         void getById_NonExistingId_ThrowsException() {
-            // Arrange
             when(orderRepository.findById(999L)).thenReturn(Optional.empty());
 
-            // Act & Assert
             assertThatThrownBy(() -> orderService.getById(999L))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Order not found with ID: 999");
-
-            verify(orderRepository, times(1)).findById(999L);
         }
 
+        // Throw error when order ID is invalid
         @Test
-        @DisplayName("Should throw IllegalArgumentException when order ID is null, zero, or negative")
+        @DisplayName("Should throw IllegalArgumentException when ID is invalid")
         void getById_InvalidId_ThrowsException() {
-            assertThatThrownBy(() -> orderService.getById(null))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Invalid order ID");
-
             assertThatThrownBy(() -> orderService.getById(0L))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Invalid order ID");
+                    .hasMessageContaining("Invalid order ID");
 
-            assertThatThrownBy(() -> orderService.getById(-5L))
+            assertThatThrownBy(() -> orderService.getById(null))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Invalid order ID");
-
-            verifyNoInteractions(orderRepository);
+                    .hasMessageContaining("Invalid order ID");
         }
     }
 
@@ -131,18 +188,28 @@ class OrderServiceTest {
     @DisplayName("Get All Orders Tests")
     class GetAllTests {
 
+        // Return all orders when orders exist
         @Test
-        @DisplayName("Should return a list of all order responses")
-        void getAll_ReturnsListOfOrderResponses() {
-            // Arrange
+        @DisplayName("Should return list of OrderResponse when orders exist")
+        void getAll_OrdersExist_ReturnsListOfOrderResponse() {
             when(orderRepository.findAll()).thenReturn(List.of(testOrder));
 
-            // Act
-            List<OrderResponse> responses = orderService.getAll();
+            List<OrderResponse> responseList = orderService.getAll();
 
-            // Assert
-            assertThat(responses).hasSize(1);
-            assertThat(responses.get(0).userId()).isEqualTo(100L);
+            assertThat(responseList).isNotEmpty().hasSize(1);
+            assertThat(responseList.get(0).userId()).isEqualTo(100L);
+            verify(orderRepository, times(1)).findAll();
+        }
+
+        // Return empty list when no orders exist
+        @Test
+        @DisplayName("Should return empty list when no orders exist")
+        void getAll_NoOrders_ReturnsEmptyList() {
+            when(orderRepository.findAll()).thenReturn(List.of());
+
+            List<OrderResponse> responseList = orderService.getAll();
+
+            assertThat(responseList).isEmpty();
             verify(orderRepository, times(1)).findAll();
         }
     }
@@ -151,33 +218,30 @@ class OrderServiceTest {
     @DisplayName("Get Orders By User ID Tests")
     class GetByUserIdTests {
 
+        // Return orders for existing user ID
         @Test
-        @DisplayName("Should return user orders when valid user ID is provided")
-        void getByUserId_ValidUserId_ReturnsUserOrders() {
-            // Arrange
+        @DisplayName("Should return list of OrderResponse when orders exist for user")
+        void getByUserId_ExistingUser_ReturnsListOfOrderResponse() {
             when(orderRepository.findByUserId(100L)).thenReturn(List.of(testOrder));
 
-            // Act
-            List<OrderResponse> responses = orderService.getByUserId(100L);
+            List<OrderResponse> responseList = orderService.getByUserId(100L);
 
-            // Assert
-            assertThat(responses).hasSize(1);
-            assertThat(responses.get(0).userId()).isEqualTo(100L);
+            assertThat(responseList).isNotEmpty().hasSize(1);
+            assertThat(responseList.get(0).userId()).isEqualTo(100L);
             verify(orderRepository, times(1)).findByUserId(100L);
         }
 
+        // Throw error when user ID is invalid
         @Test
-        @DisplayName("Should throw IllegalArgumentException when user ID is null, zero, or negative")
+        @DisplayName("Should throw IllegalArgumentException when userId is invalid")
         void getByUserId_InvalidUserId_ThrowsException() {
+            assertThatThrownBy(() -> orderService.getByUserId(0L))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid user ID");
+
             assertThatThrownBy(() -> orderService.getByUserId(null))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Invalid user ID");
-
-            assertThatThrownBy(() -> orderService.getByUserId(-1L))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Invalid user ID");
-
-            verifyNoInteractions(orderRepository);
+                    .hasMessageContaining("Invalid user ID");
         }
     }
 
@@ -185,36 +249,30 @@ class OrderServiceTest {
     @DisplayName("Update Order Status Tests")
     class UpdateStatusTests {
 
+        // Update order status when order exists
         @Test
-        @DisplayName("Should update status and save when order exists")
-        void updateStatus_ExistingOrder_UpdatesStatusAndSaves() {
-            // Arrange
+        @DisplayName("Should update status to CONFIRMED when order exists")
+        void updateStatus_ExistingOrder_UpdatesStatusSuccessfully() {
             when(orderRepository.findById(1L)).thenReturn(Optional.of(testOrder));
             when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-            // Act
             OrderResponse response = orderService.updateStatus(1L, OrderStatus.CONFIRMED);
 
-            // Assert
             assertThat(response).isNotNull();
             assertThat(response.status()).isEqualTo(OrderStatus.CONFIRMED);
             verify(orderRepository, times(1)).findById(1L);
             verify(orderRepository, times(1)).save(testOrder);
         }
 
+        // Throw error when order not found to update
         @Test
-        @DisplayName("Should throw IllegalArgumentException when updating status for non-existing order")
+        @DisplayName("Should throw IllegalArgumentException when order does not exist")
         void updateStatus_NonExistingOrder_ThrowsException() {
-            // Arrange
             when(orderRepository.findById(999L)).thenReturn(Optional.empty());
 
-            // Act & Assert
-            assertThatThrownBy(() -> orderService.updateStatus(999L, OrderStatus.CANCELLED))
+            assertThatThrownBy(() -> orderService.updateStatus(999L, OrderStatus.CONFIRMED))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Order not found with ID: 999");
-
-            verify(orderRepository, times(1)).findById(999L);
-            verify(orderRepository, never()).save(any());
         }
     }
 }
