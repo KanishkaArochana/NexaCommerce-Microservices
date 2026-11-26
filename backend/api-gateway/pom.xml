@@ -46,6 +46,12 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Official Spring Boot Starter for Zipkin Tracing -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-zipkin</artifactId>
+		</dependency>
+
 		<!-- Micrometer Tracing with Brave Bridge -->
 		<dependency>
 			<groupId>io.micrometer</groupId>
@@ -56,6 +62,12 @@
 		<dependency>
 			<groupId>io.zipkin.reporter2</groupId>
 			<artifactId>zipkin-reporter-brave</artifactId>
+		</dependency>
+
+		<!-- Zipkin URL Connection Sender for HTTP transport -->
+		<dependency>
+			<groupId>io.zipkin.reporter2</groupId>
+			<artifactId>zipkin-sender-urlconnection</artifactId>
 		</dependency>
 
 	</dependencies>
