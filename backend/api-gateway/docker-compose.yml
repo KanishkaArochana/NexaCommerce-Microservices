@@ -20,6 +20,7 @@ services:
       PAYMENT_SERVICE_HOST: payment-service
       PAYMENT_SERVICE_PORT: 8086
       HEALTH_DETAILS: ${HEALTH_DETAILS:-always}
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:${SERVER_PORT:-8080}/actuator/health | grep UP || exit 1"]
       interval: 10s
@@ -32,4 +33,4 @@ services:
 networks:
   nexacommerce-network:
     name: nexacommerce-network
-    driver: bridge
+    external: true

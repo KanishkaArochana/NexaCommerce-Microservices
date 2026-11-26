@@ -36,6 +36,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       INVENTORY_SERVICE_URL: http://inventory-service:8083
       PAYMENT_SERVICE_URL: http://payment-service:8086
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
       order-db:
         condition: service_healthy
@@ -49,4 +50,4 @@ volumes:
 networks:
   nexacommerce-network:
     name: nexacommerce-network
-    driver: bridge
+    external: true

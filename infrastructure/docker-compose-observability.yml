@@ -1,0 +1,14 @@
+services:
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
+    networks:
+      - nexacommerce-network
+
+networks:
+  nexacommerce-network:
+    name: nexacommerce-network
+    external: true
