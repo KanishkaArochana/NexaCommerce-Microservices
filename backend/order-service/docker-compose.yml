@@ -50,4 +50,4 @@ volumes:
 networks:
   nexacommerce-network:
     name: nexacommerce-network
-    driver: bridge
+    external: true
