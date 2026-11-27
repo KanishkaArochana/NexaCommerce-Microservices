@@ -32,6 +32,7 @@ services:
       DB_URL: jdbc:postgresql://inventory-db:5432/${DB_NAME:-inventory_db}
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-root}
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -45,4 +46,4 @@ volumes:
 networks:
   nexacommerce-network:
     name: nexacommerce-network
-    driver: bridge
+    external: true
